@@ -12,7 +12,7 @@
 
 GitHub Pages 地址：https://zhdivision.github.io/lzhgithub/
 
-当前正在部署，Actions 成功且后端配置完成后才能正常使用。
+已通过 GitHub Actions 发布。共享比分、口令会话、并发版本检查和修改记录已完成线上验证。
 
 ## 开发与验证
 
@@ -48,3 +48,4 @@ npm run build
 migration-data/supabase-import.json 包含迁移前 23 支球队、33 场比赛及 71 条修改记录，保留演示比分标记。scripts/generate-supabase-seed.mjs 可重建导入 SQL。
 
 测试覆盖积分与出线临界值、240 组随机比分的独立穷举比对、口令会话、来源限制、非法写入、真实 PostgreSQL 引擎中的版本冲突、审计原子性、取消结果和匿名权限拒绝。
+
