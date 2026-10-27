@@ -1,0 +1,6 @@
+project_id = "liuhe-xingchen-cup"
+
+# This function authenticates write operations with its own short-lived editor
+# session. Public reads and login must be reachable without Supabase accounts.
+[functions.cup-api]
+verify_jwt = false

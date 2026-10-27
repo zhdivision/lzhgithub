@@ -1,0 +1,32 @@
+{
+  "name": "liuhe-xingchen-cup",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "dev": "vite --config vite.pages.config.ts",
+    "build": "vite build --config vite.pages.config.ts",
+    "preview": "vite preview --config vite.pages.config.ts",
+    "test": "node --test tests/tournament.test.mjs tests/supabase-api.test.mjs tests/supabase-postgres.test.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "lucide-react": "1.31.0"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.12",
+    "@tailwindcss/postcss": "4.2.1",
+    "@types/node": "22.19.19",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "6.0.2",
+    "tailwindcss": "4.2.1",
+    "typescript": "5.9.3",
+    "vite": "8.0.13"
+  }
+}

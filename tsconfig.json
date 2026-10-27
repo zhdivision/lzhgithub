@@ -1,0 +1,40 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": [
+      "DOM",
+      "DOM.Iterable",
+      "ESNext"
+    ],
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "resolveJsonModule": true,
+    "jsx": "react-jsx",
+    "isolatedModules": true,
+    "types": [
+      "node",
+      "vite/client"
+    ],
+    "paths": {
+      "@/*": [
+        "./*"
+      ]
+    }
+  },
+  "include": [
+    "app/**/*.tsx",
+    "pages/**/*.ts",
+    "pages/**/*.tsx",
+    "lib/**/*.ts",
+    "vite.pages.config.ts",
+    "supabase/functions/cup-api/handler.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist-pages"
+  ]
+}
