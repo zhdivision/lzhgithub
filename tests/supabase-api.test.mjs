@@ -16,7 +16,7 @@ function setup() {
     },
   });
   const call = (path, method = 'GET', body, token, source = origin) => handler(new Request(`https://project.supabase.co/functions/v1/cup-api/api/${path}`, { method, headers: { ...(source ? { Origin: source } : {}), ...(token ? { Authorization: `Bearer ${token}` } : {}), 'x-forwarded-for': '198.51.100.8', 'Content-Type': 'application/json' }, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) }));
-  return { call, expire: () => { clock += 13 * 3600_000; }, writes: () => writes };
+  return { call, handler, expire: () => { clock += 13 * 3600_000; }, writes: () => writes };
 }
 const match = { kind: 'match', id: 'E-12', version: 1, homeScore: 0, awayScore: 0, status: 'live', round: 3, kickoff: null };
 
@@ -56,4 +56,14 @@ test('incorrect passwords are rate limited on the server', async () => {
   const { call } = setup();
   for (let n = 0; n < 10; n++) assert.equal((await call('session', 'POST', { password: 'wrong' })).status, 401);
   assert.equal((await call('session', 'POST', { password: 'test-only-editor-password' })).status, 429);
+});
+test('conditional reads accept weak ETags added by response compression', async () => {
+  const { call, handler } = setup();
+  const first = await call('tournament');
+  const etag = first.headers.get('ETag');
+  for (const validator of [etag, `W/${etag}`, `"different", W/${etag}`, '*']) {
+    const response = await handler(new Request('https://project.supabase.co/functions/v1/cup-api/api/tournament', { headers: { Origin: origin, 'If-None-Match': validator } }));
+    assert.equal(response.status, 304);
+    assert.equal(await response.text(), '');
+  }
 });

@@ -89,7 +89,8 @@ export function createHandler(settings: Settings) {
         if (request.method === 'GET') {
           const snapshot = await settings.database.snapshot(), text = JSON.stringify(snapshot);
           const etag = `"${await sha(text)}"`;
-          if (request.headers.get('If-None-Match') === etag) return new Response(null, { status: 304, headers: { ...headers, ETag: etag } });
+          const validators = request.headers.get('If-None-Match')?.split(',').map(value => value.trim().replace(/^W\//i, ''));
+          if (validators?.some(value => value === '*' || value === etag)) return new Response(null, { status: 304, headers: { ...headers, ETag: etag } });
           return json(snapshot, 200, { ETag: etag });
         }
         if (request.method === 'PATCH') {
