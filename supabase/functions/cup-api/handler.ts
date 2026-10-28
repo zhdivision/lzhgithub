@@ -1,11 +1,13 @@
 type Database = {
   snapshot(): Promise<unknown>;
-  update(kind: string, id: string, version: number, patch: Record<string, unknown>): Promise<{status: number; [key: string]: unknown}>;
+  update(kind: string, id: string, version: number, patch: Record<string, unknown>, admin: boolean): Promise<{status: number; [key: string]: unknown}>;
+  submitRound(round: number, version: number, matches: Record<string, unknown>[]): Promise<{status: number; [key: string]: unknown}>;
   history(id: string): Promise<unknown>;
   loginAttempt(key: string): Promise<number>;
   clearAttempts(key: string): Promise<void>;
 };
-type Settings = { password: string; sessionSecret: string; origins: string[]; database: Database; now?: () => number };
+type Settings = { password: string; adminPassword?: string; sessionSecret: string; origins: string[]; database: Database; now?: () => number };
+type Role = 'editor' | 'admin';
 const encoder = new TextEncoder();
 const hex = (value: ArrayBuffer) => Array.from(new Uint8Array(value), byte => byte.toString(16).padStart(2, '0')).join('');
 const sha = async (value: string) => hex(await crypto.subtle.digest('SHA-256', encoder.encode(value)));
@@ -38,16 +40,20 @@ function updateInput(value: unknown) {
 export function createHandler(settings: Settings) {
   const now = settings.now || Date.now;
   const origins = new Set(settings.origins);
-  const signature = async (payload: string) => {
-    const key = await crypto.subtle.importKey('raw', encoder.encode(settings.sessionSecret + settings.password), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const adminConfigured = !!settings.adminPassword && settings.adminPassword.length >= 12 && settings.adminPassword !== settings.password;
+  const signature = async (payload: string, role: Role) => {
+    const key = await crypto.subtle.importKey('raw', encoder.encode(settings.sessionSecret + (role === 'admin' ? settings.adminPassword : settings.password)), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
     return hex(await crypto.subtle.sign('HMAC', key, encoder.encode(payload)));
   };
-  const editor = async (request: Request) => {
+  const sessionRole = async (request: Request): Promise<Role | null> => {
     const token = request.headers.get('Authorization')?.replace(/^Bearer /, '') || '';
-    if (!/^\d{13}\.[a-f\d-]{36}\.[a-f\d]{64}$/.test(token)) return false;
-    const [expires, nonce, sig] = token.split('.');
-    if (Number(expires) <= now() || Number(expires) > now() + 12 * 3600_000) return false;
-    return equal(sig, await signature(`${expires}.${nonce}`));
+    if (!/^\d{13}\.[a-f\d-]{36}\.(?:(?:editor|admin)\.)?[a-f\d]{64}$/.test(token)) return null;
+    const parts = token.split('.'), [expires, nonce] = parts;
+    const role: Role = parts.length === 4 ? parts[2] as Role : 'editor';
+    if (role === 'admin' && !adminConfigured) return null;
+    if (Number(expires) <= now() || Number(expires) > now() + 12 * 3600_000) return null;
+    const payload = parts.length === 4 ? `${expires}.${nonce}.${role}` : `${expires}.${nonce}`;
+    return await equal(parts.at(-1)!, await signature(payload, role)) ? role : null;
   };
   return async (request: Request) => {
     const origin = request.headers.get('Origin');
@@ -64,26 +70,44 @@ export function createHandler(settings: Settings) {
     if (origin && !allowed) return json({ error: '此网页地址尚未获准连接比分服务' }, 403);
     if (request.method === 'OPTIONS') return new Response(null, { status: allowed ? 204 : 403, headers });
     const url = new URL(request.url), path = url.pathname.replace(/^.*(?=\/api\/)/, '');
-    if (path === '/api/health' && request.method === 'GET') return json({ passwordConfigured: !!settings.password, sessionSecretConfigured: settings.sessionSecret.length >= 32, originsConfigured: origins.size > 0 });
+    if (path === '/api/health' && request.method === 'GET') return json({ passwordConfigured: !!settings.password, adminPasswordConfigured: adminConfigured, sessionSecretConfigured: settings.sessionSecret.length >= 32, originsConfigured: origins.size > 0 });
     const write = !['GET','HEAD'].includes(request.method);
     if (write && !allowed) return json({ error: '请求来源不正确' }, 403);
     if (!settings.password || settings.sessionSecret.length < 32) return json({ error: '服务尚未配置编辑口令与会话密钥' }, 503);
     try {
       if (path === '/api/session') {
-        if (request.method === 'GET') return json({ editor: await editor(request) });
-        if (request.method === 'DELETE') return json({ editor: false });
+        if (request.method === 'GET') { const role = await sessionRole(request); return json({ editor: !!role, admin: role === 'admin' }); }
+        if (request.method === 'DELETE') return json({ editor: false, admin: false });
         if (request.method === 'POST') {
-          const input = await request.json() as { password?: unknown } | null;
+          const input = await request.json() as { password?: unknown; role?: unknown } | null;
           if (typeof input?.password !== 'string' || input.password.length > 256) return json({ error: '请输入编辑口令' }, 400);
+          if (input.role !== undefined && input.role !== 'editor' && input.role !== 'admin') return json({ error: '请选择正确的登录身份' }, 400);
+          const role: Role = input.role === 'admin' ? 'admin' : 'editor';
+          if (role === 'admin' && !adminConfigured) return json({ error: '管理员口令尚未配置，须与队员口令不同且至少12位。' }, 503);
           // Supabase's gateway supplies the forwarding chain. Do not store raw IPs.
           const client = request.headers.get('x-forwarded-for')?.split(',')[0].trim() || 'unknown';
-          const key = await sha(client + settings.sessionSecret);
+          const key = await sha(client + role + settings.sessionSecret);
           if (await settings.database.loginAttempt(key) > 10) return json({ error: '尝试次数过多，请十分钟后再试' }, 429);
-          if (!await equal(input.password, settings.password)) return json({ error: '编辑口令不正确' }, 401);
+          if (!await equal(input.password, role === 'admin' ? settings.adminPassword! : settings.password)) return json({ error: '口令不正确' }, 401);
           await settings.database.clearAttempts(key);
-          const payload = `${now() + 12 * 3600_000}.${crypto.randomUUID()}`;
-          return json({ editor: true, token: `${payload}.${await signature(payload)}` });
+          const payload = `${now() + 12 * 3600_000}.${crypto.randomUUID()}.${role}`;
+          return json({ editor: true, admin: role === 'admin', token: `${payload}.${await signature(payload, role)}` });
         }
+      }
+      if (path === '/api/rounds/submit' && request.method === 'POST') {
+        if (await sessionRole(request) !== 'admin') return json({ error: '只有管理员可以提交并锁定整轮比赛' }, 403);
+        const input = await request.json() as { round?: unknown; version?: unknown; confirmed?: unknown; matches?: unknown } | null;
+        if (!input || !Number.isInteger(input.round) || (input.round as number) < 1 || (input.round as number) > 3 || !Number.isSafeInteger(input.version) || (input.version as number) < 0 || (input.version as number) > 2_000_000_000 || input.confirmed !== true || !Array.isArray(input.matches) || input.matches.length < 1 || input.matches.length > 33) return json({ error: '请选择轮次，补齐本轮全部比分并确认锁定。' }, 400);
+        const matches: Record<string, unknown>[] = [];
+        for (const item of input.matches) {
+          if (!item || typeof item !== 'object') return json({ error: '比赛数据格式不正确' }, 400);
+          const match = item as Record<string, unknown>;
+          if (typeof match.id !== 'string' || !/^[A-F]-[1-4][1-4]$/.test(match.id) || !Number.isSafeInteger(match.version) || (match.version as number) < 0 || (match.version as number) > 2_000_000_000 || ![match.homeScore, match.awayScore].every(value => Number.isInteger(value) && (value as number) >= 0 && (value as number) <= 1_000_000_000)) return json({ error: '请为每场填写双方非负整数比分' }, 400);
+          matches.push({ id: match.id, version: match.version, homeScore: match.homeScore, awayScore: match.awayScore });
+        }
+        if (new Set(matches.map(match => match.id)).size !== matches.length) return json({ error: '提交中存在重复比赛' }, 400);
+        const { status, ...body } = await settings.database.submitRound(input.round as number, input.version as number, matches);
+        return json(body, status);
       }
       if (path === '/api/tournament') {
         if (request.method === 'GET') {
@@ -94,16 +118,17 @@ export function createHandler(settings: Settings) {
           return json(snapshot, 200, { ETag: etag });
         }
         if (request.method === 'PATCH') {
-          if (!await editor(request)) return json({ error: '请输入编辑口令后再保存' }, 403);
+          const role = await sessionRole(request);
+          if (!role) return json({ error: '请输入编辑口令后再保存' }, 403);
           const input = updateInput(await request.json());
           if (!input) return json({ error: '请检查队名、比分、轮次和开赛时间；比分须为非负整数' }, 400);
-          const result = await settings.database.update(input.kind, input.id, input.version, input.patch);
+          const result = await settings.database.update(input.kind, input.id, input.version, input.patch, role === 'admin');
           const { status, ...body } = result;
           return json(body, status);
         }
       }
       if (path === '/api/history' && request.method === 'GET') {
-        if (!await editor(request)) return json({ error: '请输入编辑口令' }, 403);
+        if (!await sessionRole(request)) return json({ error: '请输入编辑口令' }, 403);
         const id = url.searchParams.get('id');
         if (!id || id.length > 12) return json({ error: '记录编号不正确' }, 400);
         return json(await settings.database.history(id));

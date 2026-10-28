@@ -16,11 +16,13 @@ async function rest(path: string, method = 'GET', body?: unknown) {
 }
 Deno.serve(createHandler({
   password: Deno.env.get('EDITOR_PASSWORD') || '',
+  adminPassword: Deno.env.get('ADMIN_PASSWORD') || '',
   sessionSecret: Deno.env.get('SESSION_SECRET') || '',
   origins: ['https://zhdivision.github.io', ...(Deno.env.get('ALLOWED_ORIGINS') || '').split(',').map(value => { try { return new URL(value.trim()).origin; } catch { return ''; } }).filter(Boolean)],
   database: {
     snapshot: () => rest('rpc/cup_snapshot', 'POST', {}),
-    update: (kind, id, version, patch) => rest('rpc/cup_update_entity', 'POST', { p_kind: kind, p_id: id, p_version: version, p_patch: patch }),
+    update: (kind, id, version, patch, admin) => rest('rpc/cup_update_entity_secure', 'POST', { p_kind: kind, p_id: id, p_version: version, p_patch: patch, p_admin: admin }),
+    submitRound: (round, version, matches) => rest('rpc/cup_submit_round', 'POST', { p_round: round, p_version: version, p_items: matches }),
     history: async id => {
       const rows = await rest(`cup_history?entity_id=eq.${encodeURIComponent(id)}&select=id,kind,before_data,after_data,at&order=at.desc,id.desc&limit=20`);
       return rows.map((row: { id: string; kind: string; before_data: unknown; after_data: unknown; at: string }) => ({ id: row.id, kind: row.kind, before: row.before_data, after: row.after_data, at: row.at }));
