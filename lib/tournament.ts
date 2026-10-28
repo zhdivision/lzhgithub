@@ -9,12 +9,12 @@ export interface RunnerUpComparison extends Team { points: number; gd: number; p
 export interface Standing extends Team { played: number; won: number; drawn: number; lost: number; gf: number; ga: number; gd: number; points: number; h2h: number; rankMin: number; rankMax: number; secondOptions: RunnerUpComparison[] }
 export type Qualification = 'guaranteed' | 'possible' | 'out';
 const NAMES: Record<Group, string[]> = {
- A: ['计算机一队', '麦粒', '随缘FC', 'ZJ宇宙'],
+ A: ['计算机一队(Astra)', '麦粒', '随缘FC', 'ZJ宇宙'],
  B: ['三墩镇皇家语宙队', '三墩镇公园巡游者', '六号右狱卒', '菜花糕'],
  C: ['老和山之翼', '迷鹿队', '碳达峰', '万物生'],
  D: ['Ctrl pro', '三墩镇皇家漫步者2.0', '械老板'],
  E: ['老和山只因', 'Focus', 'UI老男孩', '布鲁菲尔德陆柒'],
- F: ['计算机二队', 'Supermanifold', '东三门', 'Chemlsea'],
+ F: ['计算机二队(Fable)', 'Supermanifold', '东三门', 'Chemlsea'],
 };
 export function initialSnapshot(): Snapshot {
  const teams = GROUPS.flatMap(group => NAMES[group].map((name, i) => ({ id: `${group}${i + 1}`, group, name, version: 0 })));

@@ -1,6 +1,6 @@
 -- Imported snapshot; never overwrite an existing entity.
 begin;
-insert into public.cup_teams(id,data,version) values('A1','{"id":"A1","group":"A","name":"计算机一队","version":0}'::jsonb,0) on conflict(id) do nothing;
+insert into public.cup_teams(id,data,version) values('A1','{"id":"A1","group":"A","name":"计算机一队(Astra)","version":0}'::jsonb,0) on conflict(id) do nothing;
 insert into public.cup_teams(id,data,version) values('A2','{"id":"A2","group":"A","name":"麦粒","version":0}'::jsonb,0) on conflict(id) do nothing;
 insert into public.cup_teams(id,data,version) values('A3','{"id":"A3","group":"A","name":"随缘FC","version":0}'::jsonb,0) on conflict(id) do nothing;
 insert into public.cup_teams(id,data,version) values('A4','{"id":"A4","group":"A","name":"ZJ宇宙","version":0}'::jsonb,0) on conflict(id) do nothing;
@@ -19,7 +19,7 @@ insert into public.cup_teams(id,data,version) values('E1','{"id":"E1","group":"E
 insert into public.cup_teams(id,data,version) values('E2','{"id":"E2","group":"E","name":"Focus","version":0}'::jsonb,0) on conflict(id) do nothing;
 insert into public.cup_teams(id,data,version) values('E3','{"id":"E3","group":"E","name":"UI老男孩","version":0}'::jsonb,0) on conflict(id) do nothing;
 insert into public.cup_teams(id,data,version) values('E4','{"id":"E4","group":"E","name":"布鲁菲尔德陆柒","version":0}'::jsonb,0) on conflict(id) do nothing;
-insert into public.cup_teams(id,data,version) values('F1','{"id":"F1","group":"F","name":"计算机二队","version":0}'::jsonb,0) on conflict(id) do nothing;
+insert into public.cup_teams(id,data,version) values('F1','{"id":"F1","group":"F","name":"计算机二队(Fable)","version":0}'::jsonb,0) on conflict(id) do nothing;
 insert into public.cup_teams(id,data,version) values('F2','{"id":"F2","group":"F","name":"Supermanifold","version":0}'::jsonb,0) on conflict(id) do nothing;
 insert into public.cup_teams(id,data,version) values('F3','{"id":"F3","group":"F","name":"东三门","version":0}'::jsonb,0) on conflict(id) do nothing;
 insert into public.cup_teams(id,data,version) values('F4','{"id":"F4","group":"F","name":"Chemlsea","version":0}'::jsonb,0) on conflict(id) do nothing;
