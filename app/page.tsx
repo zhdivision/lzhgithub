@@ -42,12 +42,14 @@ export default function Home() {
   finally { syncing.current = false; }
  }, []);
  useEffect(() => {
-  load(); request<{ editor: boolean; admin?: boolean }>('/api/session').then(r => { setIsEditor(r.editor); setIsAdmin(!!r.admin); }).catch(() => {});
+  const syncWhenVisible = () => { if (document.visibilityState === 'visible' && navigator.onLine) void load(); };
+  syncWhenVisible(); request<{ editor: boolean; admin?: boolean }>('/api/session').then(r => { setIsEditor(r.editor); setIsAdmin(!!r.admin); }).catch(() => {});
   try { setFocusedTeam(localStorage.getItem('xingchen-team') || ''); } catch {}
   const sessionExpired = () => { setIsEditor(false); setIsAdmin(false); };
-  const timer = setInterval(load, 5000); window.addEventListener('online', load);
+  const timer = setInterval(syncWhenVisible, 30_000); window.addEventListener('online', syncWhenVisible);
+  document.addEventListener('visibilitychange', syncWhenVisible);
   window.addEventListener('cup-session-expired', sessionExpired);
-  return () => { clearInterval(timer); window.removeEventListener('online', load); window.removeEventListener('cup-session-expired', sessionExpired); };
+  return () => { clearInterval(timer); window.removeEventListener('online', syncWhenVisible); document.removeEventListener('visibilitychange', syncWhenVisible); window.removeEventListener('cup-session-expired', sessionExpired); };
  }, [load]);
  useEffect(() => { if (!notice) return; const timer = setTimeout(() => setNotice(''), 5000); return () => clearTimeout(timer); }, [notice]);
  useEffect(() => { if (tab === 'admin' && !isAdmin) setTab('groups'); }, [tab, isAdmin]);
@@ -129,7 +131,7 @@ export default function Home() {
    </section>
    <section className="focus-banner"><div className="focus-copy"><span className="focus-star"><Star size={20}/></span><div><strong>{selected ? `正在关注 · ${selected.name}` : '关注你的球队'}</strong><p>{selected && groups ? `${selected.group} 组 · ${groups[selected.group].find(t => t.id === selected.id)?.points} 积分 · ${rowStatus(groups[selected.group].find(t => t.id === selected.id)!).label}` : '在榜单中突出显示，随时查看球队的出线形势。'}</p></div></div><div className="focus-actions"><select aria-label="关注我的队伍" value={focusedTeam} onChange={e => focusTeam(e.target.value)}><option value="">选择我的队伍</option>{teamOptions.map(t => <option key={t.id} value={t.id}>{t.group}组 · {t.name}</option>)}</select><button className="button button-green" onClick={startSimulation} disabled={!data}>推演出线 <ArrowRight size={15}/></button></div></section>
    {data?.matches.some(m => m.demo) && <div className="demo-notice" role="status"><CircleHelp size={16}/><span><strong>演示数据</strong> · 当前包含随机生成的比分与轮次，仅供预览，不代表真实赛果。</span></div>}
-   <div className="nav-row"><nav className="tabs" aria-label="看板视图"><button className={tab === 'groups' ? 'active' : ''} onClick={() => setTab('groups')}><Flag size={16}/>小组积分</button><button className={tab === 'seconds' ? 'active' : ''} onClick={() => setTab('seconds')}><Trophy size={16}/>第二名比较</button><button className={tab === 'simulation' ? 'active' : ''} onClick={startSimulation}><Calculator size={16}/>出线推演</button>{isAdmin && <button className={tab === 'admin' ? 'active' : ''} onClick={() => setTab('admin')}><ShieldCheck size={16}/>轮次提交</button>}</nav><div className="sync-status"><span className={`sync-dot ${networkError ? 'offline' : ''}`}/>{networkError ? '同步中断' : live ? `${live} 场进行中` : '每 5 秒同步'}<button className="icon-button" aria-label="立即同步" onClick={load}><RefreshCw size={13}/></button></div></div>
+   <div className="nav-row"><nav className="tabs" aria-label="看板视图"><button className={tab === 'groups' ? 'active' : ''} onClick={() => setTab('groups')}><Flag size={16}/>小组积分</button><button className={tab === 'seconds' ? 'active' : ''} onClick={() => setTab('seconds')}><Trophy size={16}/>第二名比较</button><button className={tab === 'simulation' ? 'active' : ''} onClick={startSimulation}><Calculator size={16}/>出线推演</button>{isAdmin && <button className={tab === 'admin' ? 'active' : ''} onClick={() => setTab('admin')}><ShieldCheck size={16}/>轮次提交</button>}</nav><div className="sync-status"><span className={`sync-dot ${networkError ? 'offline' : ''}`}/>{networkError ? '同步中断' : live ? `${live} 场进行中` : '每 30 秒同步'}<button className="icon-button" aria-label="立即同步" onClick={load}><RefreshCw size={13}/></button></div></div>
    {networkError && <div className="error-box" role="alert"><WifiOff size={16}/><span>{networkError}。{data ? '当前保留上次成功读取的数据。' : ''}</span><button className="text-button" onClick={load}>重试</button></div>}
    {!data || !groups ? <div className="loading-panel"><span className="loading-ball"/><h2>正在读取赛事数据</h2><p>马上就好，赛场的每一分都在这里。</p></div> : <>
    {tab === 'admin' && isAdmin && <AdminRounds data={data} onSaved={async () => { await load(); setNotice('本轮比分已提交并锁定，普通用户将无法修改。'); }}/ >}
